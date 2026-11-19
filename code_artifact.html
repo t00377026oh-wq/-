@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>たのしい ひらがな タイピング 🚁</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&display=swap');
+        
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* プロペラ回転アニメーション */
+        @keyframes spinRotor {
+            0% { transform: rotateY(0deg) scaleX(1); }
+            50% { transform: rotateY(180deg) scaleX(0.1); }
+            100% { transform: rotateY(360deg) scaleX(1); }
+        }
+        .rotor-animation {
+            animation: spinRotor 0.12s linear infinite;
+            transform-origin: center;
+        }
+
+        /* キーの輝きアニメーション */
+        @keyframes keyPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 12px rgba(245, 158, 11, 0.7); }
+            50% { transform: scale(1.05); box-shadow: 0 0 22px rgba(245, 158, 11, 1); }
+        }
+        .key-hint {
+            animation: keyPulse 1.1s infinite ease-in-out;
+            background-color: #fef08a !important; /* yellow-200 */
+            border-color: #f59e0b !important; /* amber-500 */
+            color: #b45309 !important;
+            z-index: 20;
+        }
+
+        /* 押されたキーのエフェクト */
+        .key-active {
+            transform: translateY(3px) scale(0.95) !important;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2) !important;
+        }
+
+        /* 紙吹雪アニメーション */
+        @keyframes confettiFall {
+            0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+        .confetti {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            animation: confettiFall 3s linear infinite;
+        }
+
+        /* ふわふわ浮かぶアニメーション */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+        }
+        .animate-float {
+            animation: float 3s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col items-center justify-between p-2 sm:p-4 text-slate-800 overflow-x-hidden">
+
+    <!-- トップヘッダー -->
+    <header class="w-full max-w-4xl bg-white rounded-3xl p-3 sm:p-4 shadow-sm border-2 border-slate-200 flex flex-wrap justify-between items-center gap-2 mb-2">
+        
+        <!-- モード選択タブ -->
+        <div class="flex gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+            <button id="mode-seq" class="px-3 py-1.5 rounded-xl font-black text-sm sm:text-base bg-white text-sky-600 shadow-sm transition">
+                じゅんばん
+            </button>
+            <button id="mode-random" class="px-3 py-1.5 rounded-xl font-black text-sm sm:text-base text-slate-500 hover:text-slate-800 transition">
+                ランダム
+            </button>
+            <button id="mode-word" class="px-3 py-1.5 rounded-xl font-black text-sm sm:text-base text-slate-500 hover:text-slate-800 transition">
+                たんご 🐱
+            </button>
+        </div>
+
+        <!-- 進捗（星アイコン） -->
+        <div id="row-progress" class="flex gap-1 sm:gap-1.5 items-center flex-wrap">
+            <!-- JSで動的生成 -->
+        </div>
+
+        <!-- 右上機能ボタン -->
+        <div class="flex gap-2">
+            <!-- コレクション図鑑ボタン -->
+            <button id="collection-btn" class="p-2 bg-amber-50 hover:bg-amber-100 rounded-2xl text-xl sm:text-2xl border border-amber-200 transition relative" title="ずかん">
+                🚁 <span id="badge-count" class="absolute -top-1 -right-1 bg-rose-500 text-white text-xs font-black rounded-full px-1.5 py-0.5">0</span>
+            </button>
+
+            <!-- 音声読み上げON/OFF -->
+            <button id="voice-toggle" class="p-2 bg-emerald-50 hover:bg-emerald-100 rounded-2xl text-xl sm:text-2xl border border-emerald-200 transition" title="よみあげ">
+                🗣️
+            </button>
+
+            <!-- 効果音ON/OFF -->
+            <button id="sound-toggle" class="p-2 bg-slate-100 hover:bg-slate-200 rounded-2xl text-xl sm:text-2xl border border-slate-300 transition" title="おと">
+                🔊
+            </button>
+        </div>
+    </header>
+
+    <!-- メイン表示領域 -->
+    <main class="w-full max-w-4xl flex-1 flex flex-col items-center justify-center relative my-2">
+        <div class="bg-white w-full max-w-xl rounded-3xl p-6 sm:p-8 shadow-md border-4 border-slate-200 flex flex-col items-center justify-center relative min-h-[240px]">
+            
+            <!-- サブヒント / 単語表示用 -->
+            <div id="sub-display" class="text-lg sm:text-2xl font-bold text-slate-400 mb-2 h-8 flex items-center gap-1">
+                <!-- 単語モード時の進捗などがここに入ります -->
+            </div>
+
+            <!-- 出題かな文字（巨大表示） -->
+            <div id="target-char" class="text-8xl sm:text-9xl font-black text-sky-600 transition-all transform duration-150 drop-shadow-md select-none">
+                あ
+            </div>
+
+            <!-- 単語のイラスト絵文字表示 -->
+            <div id="word-icon" class="text-4xl mt-2 hidden animate-float"></div>
+        </div>
+    </main>
+
+    <!-- JIS規格 かなキーボード -->
+    <footer class="w-full max-w-4xl bg-white rounded-3xl p-2 sm:p-4 shadow-md border-2 border-slate-200 mb-2">
+        <div id="keyboard" class="flex flex-col gap-1.5 sm:gap-2 w-full max-w-3xl mx-auto">
+            <!-- JSで動的描画 -->
+        </div>
+    </footer>
+
+    <!-- モーダル：行クリアごほうび画面 -->
+    <div id="reward-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex-col items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full text-center shadow-2xl border-4 border-yellow-300 flex flex-col items-center gap-4 animate-bounce-short relative overflow-hidden">
+            
+            <h2 id="reward-title" class="text-4xl sm:text-6xl font-black text-amber-500 tracking-wider">
+                すごーい！
+            </h2>
+            <p id="reward-subtitle" class="text-lg font-bold text-slate-600">あたらしい ヘリコプター を ゲット！</p>
+
+            <!-- ヘリコプターイラスト領域 -->
+            <div id="helicopter-container" class="w-64 h-40 sm:w-80 sm:h-48 flex items-center justify-center my-2">
+                <!-- SVG動的挿入 -->
+            </div>
+
+            <!-- つぎへボタン -->
+            <button id="next-row-btn" class="w-full py-4 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-2xl sm:text-3xl rounded-2xl shadow-lg transition flex items-center justify-center gap-2">
+                <span>つぎへ ➔</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- モーダル：全クリア／ごほうびギャラリー -->
+    <div id="final-modal" class="fixed inset-0 bg-sky-900/80 backdrop-blur-md hidden flex-col items-center justify-center z-50 p-4 overflow-y-auto">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-4xl w-full text-center shadow-2xl border-4 border-pink-400 flex flex-col items-center gap-6 relative my-auto">
+            
+            <div id="confetti-container" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+
+            <h2 id="final-title" class="text-4xl sm:text-6xl font-black text-pink-500 tracking-wide">
+                ひらがな マスター！ 🎉
+            </h2>
+
+            <!-- ヘリコプター10機ギャラリー -->
+            <div id="final-gallery" class="grid grid-cols-2 sm:grid-cols-5 gap-3 w-full bg-sky-50 p-4 rounded-2xl border-2 border-sky-200">
+                <!-- 10機が並ぶ -->
+            </div>
+
+            <!-- もう一度あそぶボタン -->
+            <button id="restart-btn" class="px-8 py-4 bg-sky-500 hover:bg-sky-600 active:scale-95 text-white font-black text-2xl sm:text-3xl rounded-2xl shadow-lg transition">
+                もういちど あそぶ 🔄
+            </button>
+        </div>
+    </div>
+
+    <!-- モーダル：コレクション図鑑 -->
+    <div id="collection-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex-col items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-3xl w-full text-center shadow-2xl border-4 border-amber-300 flex flex-col items-center gap-4 relative max-h-[90vh] overflow-y-auto">
+            
+            <h2 class="text-3xl sm:text-4xl font-black text-amber-500">
+                🚁 ヘリコプター ずかん
+            </h2>
+
+            <div id="collection-grid" class="grid grid-cols-2 sm:grid-cols-5 gap-3 w-full p-2">
+                <!-- JSで解放状況に合わせて描画 -->
+            </div>
+
+            <button id="close-collection-btn" class="mt-2 px-6 py-3 bg-slate-500 hover:bg-slate-600 active:scale-95 text-white font-black text-xl rounded-2xl shadow transition">
+                とじる
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. データ定義
+        // ==========================================
+        const KANA_GROUPS = [
+            { name: "あ行", chars: ["あ", "い", "う", "え", "お"] },
+            { name: "か行", chars: ["か", "き", "く", "け", "こ"] },
+            { name: "さ行", chars: ["さ", "し", "す", "せ", "そ"] },
+            { name: "た行", chars: ["た", "ち", "つ", "て", "と"] },
+            { name: "な行", chars: ["な", "に", "ぬ", "ね", "の"] },
+            { name: "は行", chars: ["は", "ひ", "ふ", "へ", "ほ"] },
+            { name: "ま行", chars: ["ま", "み", "む", "め", "も"] },
+            { name: "や行", chars: ["や", "ゆ", "よ"] },
+            { name: "ら行", chars: ["ら", "り", "る", "れ", "ろ"] },
+            { name: "わ行", chars: ["わ", "を", "ん"] }
+        ];
+
+        // 各行に対応するヘリコプターデザイン
+        const HELICOPTER_STYLES = [
+            { body: "#ef4444", accent: "#fca5a5", window: "#93c5fd", name: "レスキューレッド" },
+            { body: "#3b82f6", accent: "#93c5fd", window: "#e0f2fe", name: "ポリスブルー" },
+            { body: "#eab308", accent: "#fef08a", window: "#93c5fd", name: "ドクターイエロー" },
+            { body: "#22c55e", accent: "#86efac", window: "#e0f2fe", name: "フォレストグリーン" },
+            { body: "#a855f7", accent: "#d8b4fe", window: "#e0f2fe", name: "ファンシーパープル" },
+            { body: "#f97316", accent: "#fdba74", window: "#93c5fd", name: "サンシャインオレンジ" },
+            { body: "#ec4899", accent: "#fbcfe8", window: "#e0f2fe", name: "ポップピンク" },
+            { body: "#14b8a6", accent: "#99f6e4", window: "#e0f2fe", name: "オーシャンティール" },
+            { body: "#6366f1", accent: "#c7d2fe", window: "#e0f2fe", name: "コズミックインディゴ" },
+            { body: "#f43f5e", accent: "#fecdd3", window: "#93c5fd", name: "レインボースペシャル" }
+        ];
+
+        // 単語学習モード用データ
+        const WORD_LIST = [
+            { word: "いぬ", icon: "🐶" },
+            { word: "ねこ", icon: "🐱" },
+            { word: "とり", icon: "🐦" },
+            { word: "さかな", icon: "🐟" },
+            { word: "くるま", icon: "🚗" },
+            { word: "ひこうき", icon: "✈️" },
+            { word: "りんご", icon: "🍎" },
+            { word: "みかん", icon: "🍊" },
+            { word: "ほし", icon: "⭐" },
+            { word: "たいよう", icon: "☀️" }
+        ];
+
+        // JISかなキーボードレイアウト
+        const JIS_KEYBOARD_LAYOUT = [
+            [
+                { char: "ぬ", code: "Digit1" },
+                { char: "ふ", code: "Digit2" },
+                { char: "あ", code: "Digit3", shiftChar: "ぁ" },
+                { char: "う", code: "Digit4", shiftChar: "ぅ" },
+                { char: "え", code: "Digit5", shiftChar: "ぇ" },
+                { char: "お", code: "Digit6", shiftChar: "ぉ" },
+                { char: "や", code: "Digit7", shiftChar: "ゃ" },
+                { char: "ゆ", code: "Digit8", shiftChar: "ゅ" },
+                { char: "よ", code: "Digit9", shiftChar: "ょ" },
+                { char: "わ", code: "Digit0", specialWo: true },
+                { char: "ほ", code: "Minus" },
+                { char: "へ", code: "Equal" }
+            ],
+            [
+                { char: "た", code: "KeyQ" },
+                { char: "て", code: "KeyW" },
+                { char: "い", code: "KeyE", shiftChar: "ぃ" },
+                { char: "す", code: "KeyR" },
+                { char: "か", code: "KeyT" },
+                { char: "ん", code: "KeyY" },
+                { char: "な", code: "KeyU" },
+                { char: "に", code: "KeyI" },
+                { char: "ら", code: "KeyO" },
+                { char: "せ", code: "KeyP" }
+            ],
+            [
+                { char: "ち", code: "KeyA" },
+                { char: "と", code: "KeyS" },
+                { char: "し", code: "KeyD" },
+                { char: "は", code: "KeyF" },
+                { char: "き", code: "KeyG" },
+                { char: "く", code: "KeyH" },
+                { char: "ま", code: "KeyJ" },
+                { char: "の", code: "KeyK" },
+                { char: "り", code: "KeyL" },
+                { char: "れ", code: "Semicolon" },
+                { char: "け", code: "Quote" },
+                { char: "む", code: "Backslash" }
+            ],
+            [
+                { type: "shift", label: "Shift", code: "ShiftLeft" },
+                { char: "つ", code: "KeyZ", shiftChar: "っ" },
+                { char: "さ", code: "KeyX" },
+                { char: "そ", code: "KeyC" },
+                { char: "ひ", code: "KeyV" },
+                { char: "こ", code: "KeyB" },
+                { char: "み", code: "KeyN" },
+                { char: "も", code: "KeyM" },
+                { char: "ね", code: "Comma" },
+                { char: "る", code: "Period" },
+                { char: "め", code: "Slash" },
+                { char: "ろ", code: "IntlRo" },
+                { type: "shift", label: "Shift", code: "ShiftRight" }
+            ]
+        ];
+
+        // 文字→キー情報 マッピング
+        const CHAR_TO_KEY_MAP = {
+            "あ": { code: "Digit3", shift: false },
+            "い": { code: "KeyE", shift: false },
+            "う": { code: "Digit4", shift: false },
+            "え": { code: "Digit5", shift: false },
+            "お": { code: "Digit6", shift: false },
+            "か": { code: "KeyT", shift: false },
+            "き": { code: "KeyG", shift: false },
+            "く": { code: "KeyH", shift: false },
+            "け": { code: "Quote", shift: false },
+            "こ": { code: "KeyB", shift: false },
+            "さ": { code: "KeyX", shift: false },
+            "し": { code: "KeyD", shift: false },
+            "す": { code: "KeyR", shift: false },
+            "せ": { code: "KeyP", shift: false },
+            "そ": { code: "KeyC", shift: false },
+            "た": { code: "KeyQ", shift: false },
+            "ち": { code: "KeyA", shift: false },
+            "つ": { code: "KeyZ", shift: false },
+            "て": { code: "KeyW", shift: false },
+            "と": { code: "KeyS", shift: false },
+            "な": { code: "KeyU", shift: false },
+            "に": { code: "KeyI", shift: false },
+            "ぬ": { code: "Digit1", shift: false },
+            "ね": { code: "Comma", shift: false },
+            "の": { code: "KeyK", shift: false },
+            "は": { code: "KeyF", shift: false },
+            "ひ": { code: "KeyV", shift: false },
+            "ふ": { code: "Digit2", shift: false },
+            "へ": { code: "Equal", shift: false },
+            "ほ": { code: "Minus", shift: false },
+            "ま": { code: "KeyJ", shift: false },
+            "み": { code: "KeyN", shift: false },
+            "む": { code: "Backslash", shift: false },
+            "め": { code: "Slash", shift: false },
+            "も": { code: "KeyM", shift: false },
+            "や": { code: "Digit7", shift: false },
+            "ゆ": { code: "Digit8", shift: false },
+            "よ": { code: "Digit9", shift: false },
+            "ら": { code: "KeyO", shift: false },
+            "り": { code: "KeyL", shift: false },
+            "る": { code: "Period", shift: false },
+            "れ": { code: "Semicolon", shift: false },
+            "ろ": { code: "IntlRo", shift: false },
+            "わ": { code: "Digit0", shift: false },
+            "を": { code: "Digit0", shift: true },
+            "ん": { code: "KeyY", shift: false }
+        };
+
+        // ==========================================
+        // 2. 状態管理
+        // ==========================================
+        let gameMode = "seq"; // "seq", "random", "word"
+        let currentGroupIndex = 0;
+        let currentCharIndex = 0;
+        let currentWordIndex = 0;
+        let currentWordCharIndex = 0;
+        let randomCharList = [];
+        let randomCharIndex = 0;
+
+        let isAudioEnabled = true;
+        let isVoiceEnabled = true;
+        let isShiftPressed = false;
+        let unlockedHelicopters = [true, false, false, false, false, false, false, false, false, false];
+
+        // ==========================================
+        // 3. Web Audio & 音声読み上げ
+        // ==========================================
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // ひらがな音声読み上げ（Web Speech API）
+        function speakChar(text) {
+            if (!isVoiceEnabled || !('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel(); // 前の音声をキャンセル
+            const uttr = new SpeechSynthesisUtterance(text);
+            uttr.lang = 'ja-JP';
+            uttr.rate = 0.9;
+            window.speechSynthesis.speak(uttr);
+        }
+
+        // 正解音
+        function playCorrectSound() {
+            if (!isAudioEnabled) return;
+            initAudio();
+            const now = audioCtx.currentTime;
+
+            const osc1 = audioCtx.createOscillator();
+            const gain1 = audioCtx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(1046.5, now);
+            gain1.gain.setValueAtTime(0, now);
+            gain1.gain.linearRampToValueAtTime(0.2, now + 0.03);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+            osc1.connect(gain1);
+            gain1.connect(audioCtx.destination);
+            osc1.start(now);
+            osc1.stop(now + 0.4);
+
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(1318.5, now + 0.12);
+            gain2.gain.setValueAtTime(0, now + 0.12);
+            gain2.gain.linearRampToValueAtTime(0.25, now + 0.15);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+            osc2.connect(gain2);
+            gain2.connect(audioCtx.destination);
+            osc2.start(now + 0.12);
+            osc2.stop(now + 0.65);
+        }
+
+        // ファンファーレ音
+        function playCheerSound() {
+            if (!isAudioEnabled) return;
+            initAudio();
+            const now = audioCtx.currentTime;
+
+            const notes = [523.25, 659.25, 783.99, 1046.50];
+            notes.forEach((freq, idx) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+                gain.gain.setValueAtTime(0, now + idx * 0.08);
+                gain.gain.linearRampToValueAtTime(0.2, now + idx * 0.08 + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.5);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now + idx * 0.08);
+                osc.stop(now + idx * 0.08 + 0.55);
+            });
+        }
+
+        // ==========================================
+        // 4. SVG ヘリコプター描画
+        // ==========================================
+        function createHelicopterSVG(style, scale = 1, isLocked = false) {
+            if (isLocked) {
+                return `
+                <svg width="${160 * scale}" height="${110 * scale}" viewBox="0 0 200 140" class="opacity-40">
+                    <circle cx="100" cy="70" r="50" fill="#cbd5e1" />
+                    <text x="100" y="80" text-anchor="middle" font-size="40" fill="#64748b">🔒</text>
+                </svg>
+                `;
+            }
+            return `
+            <svg width="${180 * scale}" height="${120 * scale}" viewBox="0 0 200 140" class="drop-shadow-md overflow-visible">
+                <g transform="translate(25, 55)">
+                    <line x1="0" y1="-18" x2="0" y2="18" stroke="#64748b" stroke-width="4" class="rotor-animation" />
+                    <circle cx="0" cy="0" r="4" fill="#334155" />
+                </g>
+                <path d="M 30 60 L 90 50 L 90 70 Z" fill="${style.body}" stroke="#1e293b" stroke-width="3" />
+                <path d="M 20 40 L 35 40 L 30 65 Z" fill="${style.accent}" stroke="#1e293b" stroke-width="3" />
+                <path d="M 75 60 C 75 35, 120 30, 160 45 C 185 55, 185 85, 160 95 C 110 100, 75 90, 75 60 Z" fill="${style.body}" stroke="#1e293b" stroke-width="4" />
+                <path d="M 135 45 C 155 50, 170 65, 165 75 C 145 75, 130 65, 135 45 Z" fill="${style.window}" stroke="#1e293b" stroke-width="3" />
+                <path d="M 95 92 L 95 115 M 145 92 L 145 115" stroke="#475569" stroke-width="4" stroke-linecap="round" />
+                <path d="M 80 115 L 165 115" stroke="#334155" stroke-width="6" stroke-linecap="round" />
+                <rect x="115" y="18" width="8" height="15" fill="#475569" rx="2" />
+                <g transform="translate(119, 18)">
+                    <g class="rotor-animation">
+                        <ellipse cx="0" cy="0" rx="75" ry="5" fill="#1e293b" />
+                        <ellipse cx="0" cy="0" rx="75" ry="2" fill="#94a3b8" />
+                    </g>
+                    <circle cx="0" cy="0" r="6" fill="#f59e0b" />
+                </g>
+            </svg>
+            `;
+        }
+
+        // ==========================================
+        // 5. UI レンダリング
+        // ==========================================
+        function renderKeyboard() {
+            const keyboardEl = document.getElementById("keyboard");
+            keyboardEl.innerHTML = "";
+
+            JIS_KEYBOARD_LAYOUT.forEach((row) => {
+                const rowEl = document.createElement("div");
+                rowEl.className = "flex gap-1 sm:gap-1.5 justify-center w-full";
+
+                row.forEach((key) => {
+                    const btn = document.createElement("button");
+                    btn.className = "relative flex flex-col items-center justify-center font-bold rounded-xl shadow border-2 transition-all select-none ";
+
+                    if (key.type === "shift") {
+                        btn.style.flex = "1.5";
+                        btn.className += "bg-sky-200 border-sky-400 text-sky-800 text-xs sm:text-base h-11 sm:h-14";
+                        btn.dataset.code = key.code;
+                        btn.id = `key-${key.code}`;
+                        btn.innerHTML = `<span>${key.label}</span>`;
+                    } else {
+                        btn.style.flex = "1";
+                        btn.dataset.code = key.code;
+                        btn.id = `key-${key.code}`;
+
+                        if (key.specialWo) {
+                            btn.className += "bg-slate-50 border-slate-300 h-11 sm:h-14 p-0.5";
+                            btn.innerHTML = `
+                                <span class="text-[10px] sm:text-xs font-black text-sky-700 bg-sky-200 px-1 py-0.2 rounded w-full text-center border border-sky-300">を</span>
+                                <span class="text-sm sm:text-xl font-bold text-slate-700 leading-none">わ</span>
+                            `;
+                        } else {
+                            btn.className += "bg-white border-slate-300 text-slate-800 text-base sm:text-2xl h-11 sm:h-14 hover:bg-slate-50";
+                            btn.innerHTML = `<span>${key.char}</span>`;
+                        }
+                    }
+
+                    btn.addEventListener("click", (e) => {
+                        e.preventDefault();
+                        handleInput(key);
+                    });
+
+                    rowEl.appendChild(btn);
+                });
+
+                keyboardEl.appendChild(rowEl);
+            });
+        }
+
+        function renderProgress() {
+            const progressEl = document.getElementById("row-progress");
+            progressEl.innerHTML = "";
+
+            if (gameMode === "seq") {
+                KANA_GROUPS.forEach((group, idx) => {
+                    const star = document.createElement("div");
+                    star.className = "text-lg sm:text-2xl transition-all duration-300";
+                    if (idx < currentGroupIndex) {
+                        star.textContent = "⭐";
+                    } else if (idx === currentGroupIndex) {
+                        star.textContent = "⚪";
+                        star.className += " animate-pulse scale-125";
+                    } else {
+                        star.textContent = "⚫";
+                        star.style.opacity = "0.2";
+                    }
+                    progressEl.appendChild(star);
+                });
+            } else if (gameMode === "word") {
+                WORD_LIST.forEach((item, idx) => {
+                    const icon = document.createElement("div");
+                    icon.className = "text-base sm:text-xl transition-all duration-300";
+                    if (idx < currentWordIndex) {
+                        icon.textContent = "✅";
+                    } else if (idx === currentWordIndex) {
+                        icon.textContent = "🎯";
+                    } else {
+                        icon.textContent = "⚪";
+                        icon.style.opacity = "0.3";
+                    }
+                    progressEl.appendChild(icon);
+                });
+            } else {
+                // random mode
+                progressEl.innerHTML = `<span class="text-xs sm:text-sm font-bold text-sky-600 bg-sky-100 px-3 py-1 rounded-full">🎲 ランダム</span>`;
+            }
+        }
+
+        function updateDisplay() {
+            let targetChar = "あ";
+            const subDisplay = document.getElementById("sub-display");
+            const wordIcon = document.getElementById("word-icon");
+
+            wordIcon.classList.add("hidden");
+
+            if (gameMode === "seq") {
+                const currentGroup = KANA_GROUPS[currentGroupIndex];
+                targetChar = currentGroup.chars[currentCharIndex];
+                subDisplay.textContent = `${currentGroup.name} (${currentCharIndex + 1}/${currentGroup.chars.length})`;
+            } else if (gameMode === "random") {
+                targetChar = randomCharList[randomCharIndex];
+                subDisplay.textContent = `ランダム (${randomCharIndex + 1}/${randomCharList.length})`;
+            } else if (gameMode === "word") {
+                const currentWordObj = WORD_LIST[currentWordIndex];
+                targetChar = currentWordObj.word[currentWordCharIndex];
+
+                // 単語のプレビュー表示（入力済みの文字をハイライト）
+                let wordHTML = "";
+                for (let i = 0; i < currentWordObj.word.length; i++) {
+                    if (i < currentWordCharIndex) {
+                        wordHTML += `<span class="text-emerald-500 font-extrabold">${currentWordObj.word[i]}</span>`;
+                    } else if (i === currentWordCharIndex) {
+                        wordHTML += `<span class="text-sky-600 underline font-black scale-110 inline-block">${currentWordObj.word[i]}</span>`;
+                    } else {
+                        wordHTML += `<span class="text-slate-300">${currentWordObj.word[i]}</span>`;
+                    }
+                }
+                subDisplay.innerHTML = wordHTML;
+                wordIcon.textContent = currentWordObj.icon;
+                wordIcon.classList.remove("hidden");
+            }
+
+            // メイン文字の表示
+            const targetEl = document.getElementById("target-char");
+            targetEl.textContent = targetChar;
+            targetEl.classList.remove("scale-100");
+            targetEl.classList.add("scale-110");
+            setTimeout(() => targetEl.classList.remove("scale-110"), 150);
+
+            // 音声読み上げ
+            speakChar(targetChar);
+
+            // キーボードヒントハイライト
+            clearHighlights();
+            const keyInfo = CHAR_TO_KEY_MAP[targetChar];
+            if (keyInfo) {
+                const targetKeyEl = document.getElementById(`key-${keyInfo.code}`);
+                if (keyInfo.shift) {
+                    document.querySelectorAll('[id^="key-Shift"]').forEach(k => k.classList.add("key-hint"));
+                    if (targetKeyEl) targetKeyEl.classList.add("key-hint");
+                } else {
+                    if (targetKeyEl) targetKeyEl.classList.add("key-hint");
+                }
+            }
+
+            renderProgress();
+            updateBadgeCount();
+        }
+
+        function clearHighlights() {
+            document.querySelectorAll(".key-hint").forEach(el => el.classList.remove("key-hint"));
+        }
+
+        function updateBadgeCount() {
+            const count = unlockedHelicopters.filter(Boolean).length;
+            document.getElementById("badge-count").textContent = count;
+        }
+
+        // ==========================================
+        // 6. 入力処理
+        // ==========================================
+        function handleInput(pressedKeyInfo) {
+            initAudio();
+
+            let targetChar = "";
+            if (gameMode === "seq") {
+                targetChar = KANA_GROUPS[currentGroupIndex].chars[currentCharIndex];
+            } else if (gameMode === "random") {
+                targetChar = randomCharList[randomCharIndex];
+            } else if (gameMode === "word") {
+                targetChar = WORD_LIST[currentWordIndex].word[currentWordCharIndex];
+            }
+
+            const expectedKeyInfo = CHAR_TO_KEY_MAP[targetChar];
+            let isCorrect = false;
+
+            if (pressedKeyInfo.type === "shift") {
+                isShiftPressed = !isShiftPressed;
+                updateShiftVisuals();
+                return;
+            }
+
+            if (expectedKeyInfo) {
+                if (expectedKeyInfo.shift) {
+                    if (pressedKeyInfo.code === expectedKeyInfo.code && isShiftPressed) {
+                        isCorrect = true;
+                    }
+                } else {
+                    if (pressedKeyInfo.code === expectedKeyInfo.code) {
+                        isCorrect = true;
+                    }
+                }
+            }
+
+            if (isCorrect) {
+                isShiftPressed = false;
+                updateShiftVisuals();
+
+                const keyEl = document.getElementById(`key-${pressedKeyInfo.code}`);
+                if (keyEl) {
+                    keyEl.classList.add("key-active");
+                    setTimeout(() => keyEl.classList.remove("key-active"), 150);
+                }
+
+                playCorrectSound();
+
+                // モードごとの進行
+                if (gameMode === "seq") {
+                    currentCharIndex++;
+                    if (currentCharIndex >= KANA_GROUPS[currentGroupIndex].chars.length) {
+                        unlockedHelicopters[currentGroupIndex] = true;
+                        playCheerSound();
+                        showRowReward();
+                    } else {
+                        updateDisplay();
+                    }
+                } else if (gameMode === "random") {
+                    randomCharIndex++;
+                    if (randomCharIndex >= randomCharList.length) {
+                        playCheerSound();
+                        showFinalReward("🎉 ランダムモード クリア！");
+                    } else {
+                        updateDisplay();
+                    }
+                } else if (gameMode === "word") {
+                    currentWordCharIndex++;
+                    if (currentWordCharIndex >= WORD_LIST[currentWordIndex].word.length) {
+                        // 単語1つクリア
+                        speakChar(WORD_LIST[currentWordIndex].word); // 単語全読
+                        currentWordIndex++;
+                        currentWordCharIndex = 0;
+                        if (currentWordIndex >= WORD_LIST.length) {
+                            playCheerSound();
+                            showFinalReward("🐱 たんごモード クリア！");
+                        } else {
+                            setTimeout(updateDisplay, 400);
+                        }
+                    } else {
+                        updateDisplay();
+                    }
+                }
+            }
+        }
+
+        function updateShiftVisuals() {
+            document.querySelectorAll('[id^="key-Shift"]').forEach(k => {
+                if (isShiftPressed) {
+                    k.classList.add("ring-4", "ring-sky-400", "bg-sky-300");
+                } else {
+                    k.classList.remove("ring-4", "ring-sky-400", "bg-sky-300");
+                }
+            });
+        }
+
+        // ==========================================
+        // 7. モーダル ＆ イベント
+        // ==========================================
+        function showRowReward() {
+            const modal = document.getElementById("reward-modal");
+            const container = document.getElementById("helicopter-container");
+            const style = HELICOPTER_STYLES[currentGroupIndex];
+
+            container.innerHTML = createHelicopterSVG(style, 1.2);
+            modal.classList.remove("hidden");
+            modal.classList.add("flex");
+        }
+
+        document.getElementById("next-row-btn").addEventListener("click", () => {
+            const modal = document.getElementById("reward-modal");
+            modal.classList.add("hidden");
+            modal.classList.remove("flex");
+
+            currentGroupIndex++;
+            currentCharIndex = 0;
+
+            if (currentGroupIndex >= KANA_GROUPS.length) {
+                showFinalReward("🎊 ぜんぶ クリア！ ひらがなマスター！");
+            } else {
+                updateDisplay();
+            }
+        });
+
+        function showFinalReward(titleText) {
+            playCheerSound();
+            const modal = document.getElementById("final-modal");
+            const gallery = document.getElementById("final-gallery");
+            document.getElementById("final-title").textContent = titleText || "ひらがな マスター！ 🎉";
+            gallery.innerHTML = "";
+
+            HELICOPTER_STYLES.forEach((style, idx) => {
+                const isUnlocked = unlockedHelicopters[idx];
+                const card = document.createElement("div");
+                card.className = "bg-white p-2 rounded-xl border border-sky-100 shadow-sm flex flex-col items-center justify-center";
+                card.innerHTML = createHelicopterSVG(style, 0.6, !isUnlocked);
+                gallery.appendChild(card);
+            });
+
+            createConfetti();
+            modal.classList.remove("hidden");
+            modal.classList.add("flex");
+        }
+
+        function createConfetti() {
+            const container = document.getElementById("confetti-container");
+            container.innerHTML = "";
+            const colors = ["#f43f5e", "#3b82f6", "#eab308", "#22c55e", "#a855f7", "#ec4899"];
+            
+            for (let i = 0; i < 40; i++) {
+                const confetti = document.createElement("div");
+                confetti.className = "confetti rounded-sm";
+                confetti.style.left = Math.random() * 100 + "%";
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animationDelay = Math.random() * 2 + "s";
+                confetti.style.animationDuration = (2.5 + Math.random() * 1.5) + "s";
+                container.appendChild(confetti);
+            }
+        }
+
+        document.getElementById("restart-btn").addEventListener("click", () => {
+            document.getElementById("final-modal").classList.add("hidden");
+            document.getElementById("final-modal").classList.remove("flex");
+            setGameMode("seq");
+        });
+
+        // コレクション図鑑
+        document.getElementById("collection-btn").addEventListener("click", () => {
+            const modal = document.getElementById("collection-modal");
+            const grid = document.getElementById("collection-grid");
+            grid.innerHTML = "";
+
+            HELICOPTER_STYLES.forEach((style, idx) => {
+                const isUnlocked = unlockedHelicopters[idx];
+                const card = document.createElement("div");
+                card.className = "bg-slate-50 p-3 rounded-2xl border-2 border-slate-200 flex flex-col items-center justify-center gap-1";
+                card.innerHTML = `
+                    ${createHelicopterSVG(style, 0.7, !isUnlocked)}
+                    <span class="text-xs font-bold ${isUnlocked ? 'text-slate-700' : 'text-slate-400'}">${isUnlocked ? style.name : '????'}</span>
+                `;
+                grid.appendChild(card);
+            });
+
+            modal.classList.remove("hidden");
+            modal.classList.add("flex");
+        });
+
+        document.getElementById("close-collection-btn").addEventListener("click", () => {
+            document.getElementById("collection-modal").classList.add("hidden");
+            document.getElementById("collection-modal").classList.remove("flex");
+        });
+
+        // モード切替
+        function setGameMode(mode) {
+            gameMode = mode;
+            currentGroupIndex = 0;
+            currentCharIndex = 0;
+            currentWordIndex = 0;
+            currentWordCharIndex = 0;
+
+            document.getElementById("mode-seq").className = mode === "seq" ? "px-3 py-1.5 rounded-xl font-black text-sm sm:text-base bg-white text-sky-600 shadow-sm transition" : "px-3 py-1.5 rounded-xl font-black text-sm sm:text-base text-slate-500 hover:text-slate-800 transition";
+            document.getElementById("mode-random").className = mode === "random" ? "px-3 py-1.5 rounded-xl font-black text-sm sm:text-base bg-white text-sky-600 shadow-sm transition" : "px-3 py-1.5 rounded-xl font-black text-sm sm:text-base text-slate-500 hover:text-slate-800 transition";
+            document.getElementById("mode-word").className = mode === "word" ? "px-3 py-1.5 rounded-xl font-black text-sm sm:text-base bg-white text-sky-600 shadow-sm transition" : "px-3 py-1.5 rounded-xl font-black text-sm sm:text-base text-slate-500 hover:text-slate-800 transition";
+
+            if (mode === "random") {
+                const allChars = KANA_GROUPS.flatMap(g => g.chars);
+                randomCharList = allChars.sort(() => Math.random() - 0.5).slice(0, 15); // 15文字抽出
+                randomCharIndex = 0;
+            }
+
+            updateDisplay();
+        }
+
+        document.getElementById("mode-seq").addEventListener("click", () => setGameMode("seq"));
+        document.getElementById("mode-random").addEventListener("click", () => setGameMode("random"));
+        document.getElementById("mode-word").addEventListener("click", () => setGameMode("word"));
+
+        // サウンド＆音声トグル
+        document.getElementById("sound-toggle").addEventListener("click", (e) => {
+            isAudioEnabled = !isAudioEnabled;
+            e.currentTarget.textContent = isAudioEnabled ? "🔊" : "🔇";
+        });
+        document.getElementById("voice-toggle").addEventListener("click", (e) => {
+            isVoiceEnabled = !isVoiceEnabled;
+            e.currentTarget.textContent = isVoiceEnabled ? "🗣️" : "😶";
+        });
+
+        // 物理キーボードハンドラ
+        window.addEventListener("keydown", (e) => {
+            if (e.repeat) return;
+            if (e.key === "Shift") {
+                isShiftPressed = true;
+                updateShiftVisuals();
+                return;
+            }
+            handleInput({ code: e.code });
+        });
+
+        window.addEventListener("keyup", (e) => {
+            if (e.key === "Shift") {
+                isShiftPressed = false;
+                updateShiftVisuals();
+            }
+        });
+
+        // アプリ起動時Init
+        window.onload = () => {
+            renderKeyboard();
+            updateDisplay();
+        };
+    </script>
+</body>
+</html>
